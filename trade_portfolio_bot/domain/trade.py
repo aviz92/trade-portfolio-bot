@@ -1,17 +1,24 @@
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from enum import Enum
 
 from trade_portfolio_bot.domain.exceptions import (
-    InvalidBuyCommandException,
     InvalidPriceException,
     InvalidQuantityException,
     InvalidTickerException,
+    InvalidTradeCommandException,
 )
+
+
+class TradeSide(str, Enum):
+    BUY = "BUY"
+    SELL = "SELL"
 
 
 @dataclass(frozen=True)
 class Trade:
     ticker: str
+    side: TradeSide
     quantity: float
     price: float
     timestamp: datetime
@@ -22,33 +29,22 @@ class Trade:
 
     def __str__(self) -> str:
         return (
-            f"{self.ticker} | qty={self.quantity} | price={self.price} "
+            f"{self.side.value} {self.ticker} | qty={self.quantity} | price={self.price} "
             f"| total={self.total_cost:.2f} | {self.timestamp.isoformat()}"
         )
 
 
-def parse_buy_command(args: list[str]) -> Trade:
-    """
-    Parse /buy command arguments into a Trade.
-
-    Expected format: /buy TICKER QUANTITY PRICE
-    Example: /buy AAPL 10 150.5
-    """
-    if len(args) != 3:
-        raise InvalidBuyCommandException(
-            "Expected 3 arguments: TICKER QUANTITY PRICE",
-            diagnostic_info={"args": args},
-        )
-
-    raw_ticker, raw_quantity, raw_price = args
-
+def _parse_ticker(raw_ticker: str) -> str:
     ticker = raw_ticker.strip().upper()
     if not ticker.isalnum() or len(ticker) > 10:
         raise InvalidTickerException(
             f"'{raw_ticker}' does not look like a valid ticker symbol",
             diagnostic_info={"ticker": raw_ticker},
         )
+    return ticker
 
+
+def _parse_quantity(raw_quantity: str) -> float:
     try:
         quantity = float(raw_quantity)
     except ValueError as e:
@@ -61,7 +57,10 @@ def parse_buy_command(args: list[str]) -> Trade:
             "Quantity must be greater than 0",
             diagnostic_info={"quantity": quantity},
         )
+    return quantity
 
+
+def _parse_price(raw_price: str) -> float:
     try:
         price = float(raw_price)
     except ValueError as e:
@@ -74,5 +73,25 @@ def parse_buy_command(args: list[str]) -> Trade:
             "Price must be greater than 0",
             diagnostic_info={"price": price},
         )
+    return price
 
-    return Trade(ticker=ticker, quantity=quantity, price=price, timestamp=datetime.now(UTC))
+
+def parse_trade_command(args: list[str], side: TradeSide) -> Trade:
+    """
+    Parse /buy or /sell command arguments into a Trade.
+
+    Expected format: TICKER QUANTITY PRICE
+    Example: AAPL 10 150.5
+    """
+    if len(args) != 3:
+        raise InvalidTradeCommandException(
+            "Expected 3 arguments: TICKER QUANTITY PRICE",
+            diagnostic_info={"args": args},
+        )
+
+    raw_ticker, raw_quantity, raw_price = args
+    ticker = _parse_ticker(raw_ticker)
+    quantity = _parse_quantity(raw_quantity)
+    price = _parse_price(raw_price)
+
+    return Trade(ticker=ticker, side=side, quantity=quantity, price=price, timestamp=datetime.now(UTC))

@@ -1,8 +1,8 @@
 from python_custom_exceptions import BaseCustomException
 
 
-class InvalidBuyCommandException(BaseCustomException):
-    """Raised when a /buy command is missing arguments or malformed."""
+class InvalidTradeCommandException(BaseCustomException):
+    """Raised when a /buy or /sell command is missing arguments or malformed."""
 
 
 class InvalidTickerException(BaseCustomException):
