@@ -6,7 +6,7 @@
 ---
 
 # 💡 trade-portfolio-bot
-A Telegram bot for logging securities purchases and sales as you make them. Send `/buy TICKER QUANTITY PRICE` or `/sell TICKER QUANTITY PRICE` and the bot validates, logs, and confirms the trade back to you.
+A Telegram bot for logging securities purchases and sales, and cash deposits, as you make them. Send `/buy TICKER QUANTITY PRICE`, `/sell TICKER QUANTITY PRICE`, or `/deposit AMOUNT` and the bot validates, logs, and confirms it back to you.
 
 ---
 
@@ -23,10 +23,11 @@ uv sync --extra dev
 ## 🚀 Features
   - ✅ **`/buy TICKER QUANTITY PRICE`** — parses and validates a purchase, then logs and confirms it
   - ✅ **`/sell TICKER QUANTITY PRICE`** — parses and validates a sale, then logs and confirms it
-  - ✅ **Input validation** — rejects malformed tickers, non-numeric or non-positive quantity/price with a clear reason
-  - ✅ **Telegram command menu** — `/start`, `/help`, `/buy`, `/sell` registered via `set_my_commands`
+  - ✅ **`/deposit AMOUNT`** — parses and validates cash added to your portfolio, then logs and confirms it
+  - ✅ **Input validation** — rejects malformed tickers, non-numeric or non-positive quantity/price/amount with a clear reason
+  - ✅ **Telegram command menu** — `/start`, `/help`, `/buy`, `/sell`, `/deposit` registered via `set_my_commands`
   - ✅ **Structured logging** — powered by `custom-python-logger`, with diagnostic context on rejected commands
-  - ✅ **Typed custom exceptions** — `InvalidTickerException`, `InvalidQuantityException`, `InvalidPriceException`, `InvalidTradeCommandException` built on `python-custom-exceptions`
+  - ✅ **Typed custom exceptions** — `InvalidTickerException`, `InvalidQuantityException`, `InvalidPriceException`, `InvalidAmountException`, `InvalidTradeCommandException`, `InvalidCashCommandException` built on `python-custom-exceptions`
 
 ---
 
@@ -43,7 +44,7 @@ TELEGRAM_BOT_TOKEN=your_bot_token_from_botfather
 1. Step 1: Clone the repo and run `uv sync --extra dev`
 2. Step 2: Create `.env` and set `TELEGRAM_BOT_TOKEN`
 3. Step 3: Start the bot with `uv run bot`
-4. Step 4: Message the bot on Telegram — `/start` for the welcome message, `/buy AAPL 10 150.5` to log a purchase, `/sell AAPL 5 160.0` to log a sale
+4. Step 4: Message the bot on Telegram — `/start` for the welcome message, `/buy AAPL 10 150.5` to log a purchase, `/sell AAPL 5 160.0` to log a sale, `/deposit 1000` to log a cash deposit
 
 ---
 
@@ -81,6 +82,15 @@ try:
 except InvalidQuantityException as e:
     print(e.message)
 # Quantity must be greater than 0
+```
+
+### Example 3: Parsing a cash deposit
+```python
+from trade_portfolio_bot.domain.cash import parse_deposit_command
+
+cash = parse_deposit_command(["1000"])
+print(cash.amount)
+# 1000.0
 ```
 
 ---

@@ -15,3 +15,11 @@ class InvalidQuantityException(BaseCustomException):
 
 class InvalidPriceException(BaseCustomException):
     """Raised when the price is not a positive number."""
+
+
+class InvalidCashCommandException(BaseCustomException):
+    """Raised when a /deposit command is missing arguments or malformed."""
+
+
+class InvalidAmountException(BaseCustomException):
+    """Raised when the amount is not a positive number."""

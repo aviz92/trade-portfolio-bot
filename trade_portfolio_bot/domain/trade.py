@@ -8,6 +8,7 @@ from trade_portfolio_bot.domain.exceptions import (
     InvalidTickerException,
     InvalidTradeCommandException,
 )
+from trade_portfolio_bot.domain.validators import parse_positive_float
 
 
 class TradeSide(str, Enum):
@@ -45,35 +46,11 @@ def _parse_ticker(raw_ticker: str) -> str:
 
 
 def _parse_quantity(raw_quantity: str) -> float:
-    try:
-        quantity = float(raw_quantity)
-    except ValueError as e:
-        raise InvalidQuantityException(
-            f"'{raw_quantity}' is not a valid number",
-            diagnostic_info={"quantity": raw_quantity},
-        ) from e
-    if quantity <= 0:
-        raise InvalidQuantityException(
-            "Quantity must be greater than 0",
-            diagnostic_info={"quantity": quantity},
-        )
-    return quantity
+    return parse_positive_float(raw_quantity, "quantity", InvalidQuantityException)
 
 
 def _parse_price(raw_price: str) -> float:
-    try:
-        price = float(raw_price)
-    except ValueError as e:
-        raise InvalidPriceException(
-            f"'{raw_price}' is not a valid number",
-            diagnostic_info={"price": raw_price},
-        ) from e
-    if price <= 0:
-        raise InvalidPriceException(
-            "Price must be greater than 0",
-            diagnostic_info={"price": price},
-        )
-    return price
+    return parse_positive_float(raw_price, "price", InvalidPriceException)
 
 
 def parse_trade_command(args: list[str], side: TradeSide) -> Trade:

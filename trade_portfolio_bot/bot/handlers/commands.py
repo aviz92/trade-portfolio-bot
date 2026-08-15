@@ -3,6 +3,7 @@ from python_custom_exceptions import BaseCustomException
 from telegram import BotCommand, Update
 from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
 
+from trade_portfolio_bot.domain.cash import parse_deposit_command
 from trade_portfolio_bot.domain.trade import TradeSide, parse_trade_command
 
 logger = get_logger(__name__)
@@ -11,10 +12,13 @@ BUY_USAGE = "<code>/buy TICKER QUANTITY PRICE</code>"
 BUY_EXAMPLE = "<code>/buy AAPL 10 150.5</code>"
 SELL_USAGE = "<code>/sell TICKER QUANTITY PRICE</code>"
 SELL_EXAMPLE = "<code>/sell AAPL 5 160.0</code>"
+DEPOSIT_USAGE = "<code>/deposit AMOUNT</code>"
+DEPOSIT_EXAMPLE = "<code>/deposit 1000</code>"
 
 BOT_COMMANDS = [
     BotCommand("buy", "Log a purchase — TICKER QUANTITY PRICE"),
     BotCommand("sell", "Log a sale — TICKER QUANTITY PRICE"),
+    BotCommand("deposit", "Log cash added to your portfolio — AMOUNT"),
     BotCommand("help", "Show usage and available commands"),
     BotCommand("start", "Show the welcome message"),
 ]
@@ -43,6 +47,9 @@ async def help_command(update: Update, _context: ContextTypes.DEFAULT_TYPE) -> N
         f"{SELL_USAGE}\n"
         "Log a sale.\n"
         f"Example: {SELL_EXAMPLE}\n\n"
+        f"{DEPOSIT_USAGE}\n"
+        "Log cash added to your portfolio.\n"
+        f"Example: {DEPOSIT_EXAMPLE}\n\n"
         "/start — show the welcome message\n"
         "/help — show this message"
     )
@@ -87,6 +94,22 @@ async def sell(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await _log_trade(update, context, TradeSide.SELL, SELL_USAGE, SELL_EXAMPLE)
 
 
+async def deposit(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handles /deposit AMOUNT — logs cash added to the portfolio."""
+    try:
+        cash = parse_deposit_command(context.args or [])
+    except BaseCustomException as e:
+        logger.warning(f"Rejected /deposit command: {e.message}", extra={"diagnostic_info": e.diagnostic_info})
+        await update.effective_message.reply_html(
+            f"⚠️ <b>{e.message}</b>\n\nUsage: {DEPOSIT_USAGE}\nExample: {DEPOSIT_EXAMPLE}"
+        )
+        return
+
+    logger.info(f"Cash deposit logged: {cash}")
+
+    await update.effective_message.reply_html(f"✅ <b>Deposit logged</b>\n\nAmount: <b>{cash.amount:.2f}</b>")
+
+
 async def unknown_command(update: Update, _context: ContextTypes.DEFAULT_TYPE) -> None:
     """Catches any /command that isn't registered above."""
     await update.effective_message.reply_html(
@@ -99,4 +122,5 @@ def register_command_handlers(app: Application) -> None:
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("buy", buy))
     app.add_handler(CommandHandler("sell", sell))
+    app.add_handler(CommandHandler("deposit", deposit))
     app.add_handler(MessageHandler(filters.COMMAND, unknown_command))
