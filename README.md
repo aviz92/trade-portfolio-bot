@@ -24,8 +24,10 @@ uv sync --extra dev
   - ✅ **`/buy TICKER QUANTITY PRICE`** — parses and validates a purchase, then logs and confirms it
   - ✅ **`/sell TICKER QUANTITY PRICE`** — parses and validates a sale, then logs and confirms it
   - ✅ **`/deposit AMOUNT`** — parses and validates cash added to your portfolio, then logs and confirms it
+  - ✅ **SQLite persistence** — every trade and deposit is saved per-user via `PortfolioRepository`, survives restarts
+  - ✅ **Optional user allowlist** — set `ALLOWED_TELEGRAM_USER_IDS` to restrict who can talk to the bot at all; `/whoami` always stays reachable so new users can get their ID added
   - ✅ **Input validation** — rejects malformed tickers, non-numeric or non-positive quantity/price/amount with a clear reason
-  - ✅ **Telegram command menu** — `/start`, `/help`, `/buy`, `/sell`, `/deposit` registered via `set_my_commands`
+  - ✅ **Telegram command menu** — `/start`, `/help`, `/buy`, `/sell`, `/deposit`, `/whoami` registered via `set_my_commands`
   - ✅ **Structured logging** — powered by `custom-python-logger`, with diagnostic context on rejected commands
   - ✅ **Typed custom exceptions** — `InvalidTickerException`, `InvalidQuantityException`, `InvalidPriceException`, `InvalidAmountException`, `InvalidTradeCommandException`, `InvalidCashCommandException` built on `python-custom-exceptions`
 
@@ -33,10 +35,14 @@ uv sync --extra dev
 
 ## ⚙️ Configuration
 
-Create a `.env` file with the following variable:
+Create a `.env` file with the following variables:
 ```env
 TELEGRAM_BOT_TOKEN=your_bot_token_from_botfather
+DATABASE_PATH=trade_portfolio_bot.db          # optional, defaults to trade_portfolio_bot.db in the working directory
+ALLOWED_TELEGRAM_USER_IDS=123456789,987654321 # optional, comma-separated Telegram user IDs; unset = open to everyone
 ```
+
+Don't know your Telegram user ID? Message the bot `/whoami` — it always replies with your ID, even if you're not on the allowlist yet.
 
 ---
 
@@ -93,10 +99,19 @@ print(cash.amount)
 # 1000.0
 ```
 
+### Example 4: Persisting a trade to SQLite
+```python
+from trade_portfolio_bot.db.repository import PortfolioRepository
+from trade_portfolio_bot.domain.trade import TradeSide, parse_trade_command
+
+repository = PortfolioRepository("trade_portfolio_bot.db")
+trade = parse_trade_command(["AAPL", "10", "150.5"], side=TradeSide.BUY)
+repository.save_trade(trade, user_id=123456789)  # Telegram user ID
+```
+
 ---
 
 ## 🗺️ Roadmap
-- [ ] Persist trades (SQLite / Postgres via `python-databases`)
 - [ ] `/portfolio` command to view holdings summary
 - [ ] Export to CSV / Google Sheets
 

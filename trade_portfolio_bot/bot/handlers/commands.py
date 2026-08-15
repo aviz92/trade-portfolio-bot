@@ -1,8 +1,16 @@
 from custom_python_logger import get_logger
 from python_custom_exceptions import BaseCustomException
 from telegram import BotCommand, Update
-from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
+from telegram.ext import (
+    Application,
+    ApplicationHandlerStop,
+    CommandHandler,
+    ContextTypes,
+    MessageHandler,
+    filters,
+)
 
+from trade_portfolio_bot.config import ALLOWED_TELEGRAM_USER_IDS
 from trade_portfolio_bot.domain.cash import parse_deposit_command
 from trade_portfolio_bot.domain.trade import TradeSide, parse_trade_command
 
@@ -19,9 +27,30 @@ BOT_COMMANDS = [
     BotCommand("buy", "Log a purchase — TICKER QUANTITY PRICE"),
     BotCommand("sell", "Log a sale — TICKER QUANTITY PRICE"),
     BotCommand("deposit", "Log cash added to your portfolio — AMOUNT"),
+    BotCommand("whoami", "Show your Telegram user ID"),
     BotCommand("help", "Show usage and available commands"),
     BotCommand("start", "Show the welcome message"),
 ]
+
+
+def _is_whoami_command(update: Update) -> bool:
+    if not (text := update.effective_message.text if update.effective_message else None):
+        return False
+    return text.split()[0].split("@")[0] == "/whoami"
+
+
+async def guard_allowed_users(update: Update, _context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Blocks non-allowlisted users before any command handler runs."""
+    # /whoami stays open so a locked-down bot can still onboard new users onto the allowlist.
+    if not ALLOWED_TELEGRAM_USER_IDS or _is_whoami_command(update):
+        return
+    if update.effective_user and update.effective_user.id in ALLOWED_TELEGRAM_USER_IDS:
+        return
+
+    user_id = update.effective_user.id if update.effective_user else None
+    logger.warning(f"Rejected message from non-allowed user_id={user_id}")
+    await update.effective_message.reply_html("⛔ <b>You're not authorized to use this bot.</b>")
+    raise ApplicationHandlerStop
 
 
 async def start(update: Update, _context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -41,17 +70,18 @@ async def help_command(update: Update, _context: ContextTypes.DEFAULT_TYPE) -> N
     """Sent when user types /help."""
     await update.effective_message.reply_html(
         "<b>📖 Available commands</b>\n\n"
+        "/start — show the welcome message\n"
+        "/help — show this message\n"
+        "/whoami — show your Telegram user ID\n\n"
+        f"{DEPOSIT_USAGE}\n"
+        "Log cash added to your portfolio.\n"
+        f"Example: {DEPOSIT_EXAMPLE}\n\n"
         f"{BUY_USAGE}\n"
         "Log a purchase.\n"
         f"Example: {BUY_EXAMPLE}\n\n"
         f"{SELL_USAGE}\n"
         "Log a sale.\n"
-        f"Example: {SELL_EXAMPLE}\n\n"
-        f"{DEPOSIT_USAGE}\n"
-        "Log cash added to your portfolio.\n"
-        f"Example: {DEPOSIT_EXAMPLE}\n\n"
-        "/start — show the welcome message\n"
-        "/help — show this message"
+        f"Example: {SELL_EXAMPLE}"
     )
 
 
@@ -72,6 +102,7 @@ async def _log_trade(
         await update.effective_message.reply_html(f"⚠️ <b>{e.message}</b>\n\nUsage: {usage}\nExample: {example}")
         return
 
+    context.bot_data["repository"].save_trade(trade, user_id=update.effective_user.id)
     logger.info(f"New trade logged: {trade}")
 
     await update.effective_message.reply_html(
@@ -105,9 +136,15 @@ async def deposit(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         )
         return
 
+    context.bot_data["repository"].save_deposit(cash, user_id=update.effective_user.id)
     logger.info(f"Cash deposit logged: {cash}")
 
     await update.effective_message.reply_html(f"✅ <b>Deposit logged</b>\n\nAmount: <b>{cash.amount:.2f}</b>")
+
+
+async def whoami(update: Update, _context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handles /whoami — replies with the sender's Telegram user ID."""
+    await update.effective_message.reply_html(f"🆔 Your Telegram user ID is <code>{update.effective_user.id}</code>.")
 
 
 async def unknown_command(update: Update, _context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -118,9 +155,11 @@ async def unknown_command(update: Update, _context: ContextTypes.DEFAULT_TYPE) -
 
 
 def register_command_handlers(app: Application) -> None:
+    app.add_handler(MessageHandler(filters.ALL, guard_allowed_users), group=-1)
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("buy", buy))
     app.add_handler(CommandHandler("sell", sell))
     app.add_handler(CommandHandler("deposit", deposit))
+    app.add_handler(CommandHandler("whoami", whoami))
     app.add_handler(MessageHandler(filters.COMMAND, unknown_command))
