@@ -23,11 +23,12 @@ uv sync --extra dev
 ## 🚀 Features
   - ✅ **`/buy TICKER QUANTITY PRICE`** — parses and validates a purchase, then logs and confirms it
   - ✅ **`/sell TICKER QUANTITY PRICE`** — parses and validates a sale, then logs and confirms it
-  - ✅ **`/deposit AMOUNT`** — parses and validates cash added to your portfolio, then logs and confirms it
+  - ✅ **`/deposit AMOUNT`** (ILS) — parses and validates cash added to your portfolio, then logs and confirms it
+  - ✅ **`/balance`** — shows total cash deposited (ILS) and stock holdings (net quantity per ticker); the two aren't netted against each other, since trades aren't tracked in ILS
   - ✅ **SQLite persistence** — every trade and deposit is saved per-user via `PortfolioRepository`, survives restarts
   - ✅ **Optional user allowlist** — set `ALLOWED_TELEGRAM_USER_IDS` to restrict who can talk to the bot at all; `/whoami` always stays reachable so new users can get their ID added
   - ✅ **Input validation** — rejects malformed tickers, non-numeric or non-positive quantity/price/amount with a clear reason
-  - ✅ **Telegram command menu** — `/start`, `/help`, `/buy`, `/sell`, `/deposit`, `/whoami` registered via `set_my_commands`
+  - ✅ **Telegram command menu** — `/start`, `/help`, `/buy`, `/sell`, `/deposit`, `/whoami`, `/balance` registered via `set_my_commands`
   - ✅ **Structured logging** — powered by `custom-python-logger`, with diagnostic context on rejected commands
   - ✅ **Typed custom exceptions** — `InvalidTickerException`, `InvalidQuantityException`, `InvalidPriceException`, `InvalidAmountException`, `InvalidTradeCommandException`, `InvalidCashCommandException` built on `python-custom-exceptions`
 
@@ -50,7 +51,7 @@ Don't know your Telegram user ID? Message the bot `/whoami` — it always replie
 1. Step 1: Clone the repo and run `uv sync --extra dev`
 2. Step 2: Create `.env` and set `TELEGRAM_BOT_TOKEN`
 3. Step 3: Start the bot with `uv run bot`
-4. Step 4: Message the bot on Telegram — `/start` for the welcome message, `/buy AAPL 10 150.5` to log a purchase, `/sell AAPL 5 160.0` to log a sale, `/deposit 1000` to log a cash deposit
+4. Step 4: Message the bot on Telegram — `/start` for the welcome message, `/buy AAPL 10 150.5` to log a purchase, `/sell AAPL 5 160.0` to log a sale, `/deposit 1000` to log a cash deposit, `/balance` to see your cash and holdings
 
 ---
 
@@ -109,10 +110,21 @@ trade = parse_trade_command(["AAPL", "10", "150.5"], side=TradeSide.BUY)
 repository.save_trade(trade, user_id=123456789)  # Telegram user ID
 ```
 
+### Example 5: Reading a user's cash balance and holdings
+```python
+from trade_portfolio_bot.domain.cash import parse_deposit_command
+
+repository.save_deposit(parse_deposit_command(["1000"]), user_id=123456789)
+
+balance = repository.get_cash_balance(user_id=123456789)  # deposits only, not netted against trades
+holdings = repository.get_holdings(user_id=123456789)
+print(balance, holdings)
+# 1000.0 [('AAPL', 10.0)]
+```
+
 ---
 
 ## 🗺️ Roadmap
-- [ ] `/portfolio` command to view holdings summary
 - [ ] Export to CSV / Google Sheets
 
 ---

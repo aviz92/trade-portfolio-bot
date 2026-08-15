@@ -20,14 +20,15 @@ BUY_USAGE = "<code>/buy TICKER QUANTITY PRICE</code>"
 BUY_EXAMPLE = "<code>/buy AAPL 10 150.5</code>"
 SELL_USAGE = "<code>/sell TICKER QUANTITY PRICE</code>"
 SELL_EXAMPLE = "<code>/sell AAPL 5 160.0</code>"
-DEPOSIT_USAGE = "<code>/deposit AMOUNT</code>"
+DEPOSIT_USAGE = "<code>/deposit AMOUNT</code> (ILS)"
 DEPOSIT_EXAMPLE = "<code>/deposit 1000</code>"
 
 BOT_COMMANDS = [
     BotCommand("buy", "Log a purchase — TICKER QUANTITY PRICE"),
     BotCommand("sell", "Log a sale — TICKER QUANTITY PRICE"),
-    BotCommand("deposit", "Log cash added to your portfolio — AMOUNT"),
+    BotCommand("deposit", "Log cash added to your portfolio, in ILS — AMOUNT"),
     BotCommand("whoami", "Show your Telegram user ID"),
+    BotCommand("balance", "Show your cash balance"),
     BotCommand("help", "Show usage and available commands"),
     BotCommand("start", "Show the welcome message"),
 ]
@@ -72,7 +73,8 @@ async def help_command(update: Update, _context: ContextTypes.DEFAULT_TYPE) -> N
         "<b>📖 Available commands</b>\n\n"
         "/start — show the welcome message\n"
         "/help — show this message\n"
-        "/whoami — show your Telegram user ID\n\n"
+        "/whoami — show your Telegram user ID\n"
+        "/balance — show your cash balance\n\n"
         f"{DEPOSIT_USAGE}\n"
         "Log cash added to your portfolio.\n"
         f"Example: {DEPOSIT_EXAMPLE}\n\n"
@@ -139,12 +141,27 @@ async def deposit(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     context.bot_data["repository"].save_deposit(cash, user_id=update.effective_user.id)
     logger.info(f"Cash deposit logged: {cash}")
 
-    await update.effective_message.reply_html(f"✅ <b>Deposit logged</b>\n\nAmount: <b>{cash.amount:.2f}</b>")
+    await update.effective_message.reply_html(f"✅ <b>Deposit logged</b>\n\nAmount: <b>{cash.amount:.2f} ₪</b>")
 
 
 async def whoami(update: Update, _context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handles /whoami — replies with the sender's Telegram user ID."""
     await update.effective_message.reply_html(f"🆔 Your Telegram user ID is <code>{update.effective_user.id}</code>.")
+
+
+async def balance(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handles /balance — replies with the sender's cash balance and stock holdings."""
+    repository = context.bot_data["repository"]
+    user_id = update.effective_user.id
+    cash_balance = repository.get_cash_balance(user_id)
+    holdings = repository.get_holdings(user_id)
+
+    holdings_lines = "\n".join(f"{ticker}: {quantity:g} stocks" for ticker, quantity in holdings) or "(none)"
+
+    await update.effective_message.reply_html(
+        f"💰 <b>Cash:</b> {cash_balance:.2f} ₪\n\n"
+        f"📈 <b>Stocks held</b> (quantity — no market value)\n{holdings_lines}"
+    )
 
 
 async def unknown_command(update: Update, _context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -162,4 +179,5 @@ def register_command_handlers(app: Application) -> None:
     app.add_handler(CommandHandler("sell", sell))
     app.add_handler(CommandHandler("deposit", deposit))
     app.add_handler(CommandHandler("whoami", whoami))
+    app.add_handler(CommandHandler("balance", balance))
     app.add_handler(MessageHandler(filters.COMMAND, unknown_command))

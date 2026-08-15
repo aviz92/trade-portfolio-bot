@@ -1,9 +1,13 @@
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from telegram.ext import ApplicationHandlerStop
 
 from trade_portfolio_bot.bot.handlers import commands
+from trade_portfolio_bot.db.repository import PortfolioRepository
+from trade_portfolio_bot.domain.cash import CashDeposit
+from trade_portfolio_bot.domain.trade import Trade, TradeSide
 
 
 def _make_update(user_id, text="/buy AAPL 10 150.5"):
@@ -67,3 +71,35 @@ async def test_whoami_replies_with_the_sender_user_id():
 
     update.effective_message.reply_html.assert_called_once()
     assert "222" in update.effective_message.reply_html.call_args[0][0]
+
+
+async def test_balance_replies_with_cash_and_no_holdings(tmp_path):
+    repo = PortfolioRepository(tmp_path / "test.db")
+    repo.save_deposit(CashDeposit(amount=1000, timestamp=datetime.now(UTC)), user_id=222)
+
+    update = _make_update(222, text="/balance")
+    context = MagicMock()
+    context.bot_data = {"repository": repo}
+
+    await commands.balance(update, context)
+
+    reply = update.effective_message.reply_html.call_args[0][0]
+    assert "1000.00" in reply
+    assert "(none)" in reply
+
+
+async def test_balance_replies_with_cash_and_holdings(tmp_path):
+    repo = PortfolioRepository(tmp_path / "test.db")
+    repo.save_deposit(CashDeposit(amount=1000, timestamp=datetime.now(UTC)), user_id=222)
+    repo.save_trade(
+        Trade(ticker="AAPL", side=TradeSide.BUY, quantity=10, price=150.5, timestamp=datetime.now(UTC)), user_id=222
+    )
+
+    update = _make_update(222, text="/balance")
+    context = MagicMock()
+    context.bot_data = {"repository": repo}
+
+    await commands.balance(update, context)
+
+    reply = update.effective_message.reply_html.call_args[0][0]
+    assert "AAPL: 10 stocks" in reply
