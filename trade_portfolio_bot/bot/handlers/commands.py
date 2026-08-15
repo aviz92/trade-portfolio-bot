@@ -3,7 +3,7 @@ from python_custom_exceptions import BaseCustomException
 from telegram import BotCommand, Update
 from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
 
-from trade_portfolio_bot.trade import parse_buy_command
+from trade_portfolio_bot.domain.trade import parse_buy_command
 
 logger = get_logger(__name__)
 
@@ -20,7 +20,7 @@ BOT_COMMANDS = [
 async def start(update: Update, _context: ContextTypes.DEFAULT_TYPE) -> None:
     """Sent when user types /start."""
     user = update.effective_user
-    await update.message.reply_html(
+    await update.effective_message.reply_html(
         f"👋 <b>Welcome, {user.first_name}!</b>\n\n"
         "I track your portfolio's securities purchases.\n\n"
         "<b>Get started</b>\n"
@@ -32,7 +32,7 @@ async def start(update: Update, _context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def help_command(update: Update, _context: ContextTypes.DEFAULT_TYPE) -> None:
     """Sent when user types /help."""
-    await update.message.reply_html(
+    await update.effective_message.reply_html(
         "<b>📖 Available commands</b>\n\n"
         f"{BUY_USAGE}\n"
         "Log a purchase.\n"
@@ -48,12 +48,14 @@ async def buy(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         trade = parse_buy_command(context.args or [])
     except BaseCustomException as e:
         logger.warning(f"Rejected /buy command: {e.message}", extra={"diagnostic_info": e.diagnostic_info})
-        await update.message.reply_html(f"⚠️ <b>{e.message}</b>\n\nUsage: {BUY_USAGE}\nExample: {BUY_EXAMPLE}")
+        await update.effective_message.reply_html(
+            f"⚠️ <b>{e.message}</b>\n\nUsage: {BUY_USAGE}\nExample: {BUY_EXAMPLE}"
+        )
         return
 
     logger.info(f"New trade logged: {trade}")
 
-    await update.message.reply_html(
+    await update.effective_message.reply_html(
         "✅ <b>Trade logged</b>\n\n"
         f"Ticker:  <b>{trade.ticker}</b>\n"
         f"Qty:     {trade.quantity:g}\n"
@@ -64,8 +66,8 @@ async def buy(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def unknown_command(update: Update, _context: ContextTypes.DEFAULT_TYPE) -> None:
     """Catches any /command that isn't registered above."""
-    await update.message.reply_html(
-        f"❓ Unrecognized command: <code>{update.message.text}</code>\n\nSend /help to see available commands."
+    await update.effective_message.reply_html(
+        f"❓ Unrecognized command: <code>{update.effective_message.text}</code>\n\nSend /help to see available commands."
     )
 
 

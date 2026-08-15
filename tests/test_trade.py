@@ -1,12 +1,12 @@
 import pytest
 
-from trade_portfolio_bot.exceptions import (
+from trade_portfolio_bot.domain.exceptions import (
     InvalidBuyCommandException,
     InvalidPriceException,
     InvalidQuantityException,
     InvalidTickerException,
 )
-from trade_portfolio_bot.trade import parse_buy_command
+from trade_portfolio_bot.domain.trade import parse_buy_command
 
 
 def test_parse_buy_command_valid():

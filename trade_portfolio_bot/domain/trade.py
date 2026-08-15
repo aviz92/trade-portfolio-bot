@@ -1,7 +1,7 @@
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-from trade_portfolio_bot.exceptions import (
+from trade_portfolio_bot.domain.exceptions import (
     InvalidBuyCommandException,
     InvalidPriceException,
     InvalidQuantityException,
@@ -75,4 +75,4 @@ def parse_buy_command(args: list[str]) -> Trade:
             diagnostic_info={"price": price},
         )
 
-    return Trade(ticker=ticker, quantity=quantity, price=price, timestamp=datetime.now(timezone.utc))
+    return Trade(ticker=ticker, quantity=quantity, price=price, timestamp=datetime.now(UTC))

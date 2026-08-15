@@ -35,7 +35,7 @@ dev = [
 ]
 
 [project.scripts]
-bot = "trade_portfolio_bot.bot:main"
+bot = "trade_portfolio_bot.bot.app:main"
 
 [project.urls]
 Homepage = "https://github.com/aviz92/trade-portfolio-bot"

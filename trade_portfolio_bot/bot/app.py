@@ -2,8 +2,8 @@ from custom_python_logger import get_logger
 from telegram import Update
 from telegram.ext import Application, ContextTypes
 
+from trade_portfolio_bot.bot.handlers.commands import BOT_COMMANDS, register_command_handlers
 from trade_portfolio_bot.config import TELEGRAM_BOT_TOKEN
-from trade_portfolio_bot.handlers.commands import BOT_COMMANDS, register_command_handlers
 
 logger = get_logger(__name__)
 
