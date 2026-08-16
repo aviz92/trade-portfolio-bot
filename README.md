@@ -27,8 +27,9 @@ uv sync --extra dev
   - ✅ **`/balance`** — shows total cash deposited (ILS) and stock holdings (net quantity per ticker); the two aren't netted against each other, since trades aren't tracked in ILS
   - ✅ **SQLite persistence** — every trade and deposit is saved per-user via `PortfolioRepository`, survives restarts
   - ✅ **Optional user allowlist** — set `ALLOWED_TELEGRAM_USER_IDS` to restrict who can talk to the bot at all; `/whoami` always stays reachable so new users can get their ID added
+  - ✅ **`/reset`** — deletes all your trades and deposits, behind a ✅ Confirm / ❌ Cancel button prompt; only the user who ran it can confirm
   - ✅ **Input validation** — rejects malformed tickers, non-numeric or non-positive quantity/price/amount with a clear reason
-  - ✅ **Telegram command menu** — `/start`, `/help`, `/buy`, `/sell`, `/deposit`, `/whoami`, `/balance` registered via `set_my_commands`
+  - ✅ **Telegram command menu** — `/start`, `/help`, `/buy`, `/sell`, `/deposit`, `/whoami`, `/balance`, `/reset` registered via `set_my_commands`
   - ✅ **Structured logging** — powered by `custom-python-logger`, with diagnostic context on rejected commands
   - ✅ **Typed custom exceptions** — `InvalidTickerException`, `InvalidQuantityException`, `InvalidPriceException`, `InvalidAmountException`, `InvalidTradeCommandException`, `InvalidCashCommandException` built on `python-custom-exceptions`
 
@@ -120,6 +121,13 @@ balance = repository.get_cash_balance(user_id=123456789)  # deposits only, not n
 holdings = repository.get_holdings(user_id=123456789)
 print(balance, holdings)
 # 1000.0 [('AAPL', 10.0)]
+```
+
+### Example 6: Resetting a user's data
+```python
+repository.reset_user_data(user_id=123456789)
+print(repository.get_cash_balance(user_id=123456789), repository.get_holdings(user_id=123456789))
+# 0 []
 ```
 
 ---

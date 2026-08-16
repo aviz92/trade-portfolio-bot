@@ -1,9 +1,10 @@
 from custom_python_logger import get_logger
 from python_custom_exceptions import BaseCustomException
-from telegram import BotCommand, Update
+from telegram import BotCommand, InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import (
     Application,
     ApplicationHandlerStop,
+    CallbackQueryHandler,
     CommandHandler,
     ContextTypes,
     MessageHandler,
@@ -29,9 +30,12 @@ BOT_COMMANDS = [
     BotCommand("deposit", "Log cash added to your portfolio, in ILS — AMOUNT"),
     BotCommand("whoami", "Show your Telegram user ID"),
     BotCommand("balance", "Show your cash balance"),
+    BotCommand("reset", "Delete all your trades and deposits (asks to confirm)"),
     BotCommand("help", "Show usage and available commands"),
     BotCommand("start", "Show the welcome message"),
 ]
+
+RESET_CALLBACK_PATTERN = r"^reset:(confirm|cancel):\d+$"
 
 
 def _is_whoami_command(update: Update) -> bool:
@@ -74,7 +78,8 @@ async def help_command(update: Update, _context: ContextTypes.DEFAULT_TYPE) -> N
         "/start — show the welcome message\n"
         "/help — show this message\n"
         "/whoami — show your Telegram user ID\n"
-        "/balance — show your cash balance\n\n"
+        "/balance — show your cash balance\n"
+        "/reset — delete all your trades and deposits (asks to confirm)\n\n"
         f"{DEPOSIT_USAGE}\n"
         "Log cash added to your portfolio.\n"
         f"Example: {DEPOSIT_EXAMPLE}\n\n"
@@ -164,6 +169,43 @@ async def balance(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     )
 
 
+async def reset(update: Update, _context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handles /reset — asks the sender to confirm before wiping their trades and deposits."""
+    user_id = update.effective_user.id
+    keyboard = InlineKeyboardMarkup(
+        [
+            [
+                InlineKeyboardButton("✅ Confirm", callback_data=f"reset:confirm:{user_id}"),
+                InlineKeyboardButton("❌ Cancel", callback_data=f"reset:cancel:{user_id}"),
+            ]
+        ]
+    )
+    await update.effective_message.reply_html(
+        "⚠️ <b>This deletes all your trades and cash deposits. This cannot be undone.</b>\n\nAre you sure?",
+        reply_markup=keyboard,
+    )
+
+
+async def reset_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handles the Confirm/Cancel button presses from /reset."""
+    query = update.callback_query
+    _, action, raw_user_id = query.data.split(":")
+    target_user_id = int(raw_user_id)
+
+    if query.from_user.id != target_user_id:
+        await query.answer("This confirmation isn't yours.", show_alert=True)
+        return
+    await query.answer()
+
+    if action == "cancel":
+        await query.edit_message_text("❌ Reset cancelled — nothing was deleted.")
+        return
+
+    context.bot_data["repository"].reset_user_data(target_user_id)
+    logger.warning(f"Reset data for user_id={target_user_id}")
+    await query.edit_message_text("✅ Your data has been reset — all trades and deposits deleted.")
+
+
 async def unknown_command(update: Update, _context: ContextTypes.DEFAULT_TYPE) -> None:
     """Catches any /command that isn't registered above."""
     await update.effective_message.reply_html(
@@ -180,4 +222,6 @@ def register_command_handlers(app: Application) -> None:
     app.add_handler(CommandHandler("deposit", deposit))
     app.add_handler(CommandHandler("whoami", whoami))
     app.add_handler(CommandHandler("balance", balance))
+    app.add_handler(CommandHandler("reset", reset))
+    app.add_handler(CallbackQueryHandler(reset_callback, pattern=RESET_CALLBACK_PATTERN))
     app.add_handler(MessageHandler(filters.COMMAND, unknown_command))

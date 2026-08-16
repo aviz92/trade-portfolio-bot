@@ -138,3 +138,27 @@ def test_get_holdings_is_scoped_per_user(tmp_path):
 
     assert repo.get_holdings(user_id=111) == [("AAPL", 5.0)]
     assert repo.get_holdings(user_id=222) == [("MSFT", 3.0)]
+
+
+def test_reset_user_data_clears_trades_and_deposits(tmp_path):
+    repo = PortfolioRepository(tmp_path / "test.db")
+    repo.save_deposit(CashDeposit(amount=1000, timestamp=datetime.now(UTC)), user_id=111)
+    _save_trade(repo, "AAPL", TradeSide.BUY, 10, user_id=111)
+
+    repo.reset_user_data(user_id=111)
+
+    assert repo.get_cash_balance(user_id=111) == 0
+    assert not repo.get_holdings(user_id=111)
+
+
+def test_reset_user_data_leaves_other_users_untouched(tmp_path):
+    repo = PortfolioRepository(tmp_path / "test.db")
+    repo.save_deposit(CashDeposit(amount=1000, timestamp=datetime.now(UTC)), user_id=111)
+    _save_trade(repo, "AAPL", TradeSide.BUY, 10, user_id=111)
+    repo.save_deposit(CashDeposit(amount=500, timestamp=datetime.now(UTC)), user_id=222)
+    _save_trade(repo, "MSFT", TradeSide.BUY, 3, user_id=222)
+
+    repo.reset_user_data(user_id=111)
+
+    assert repo.get_cash_balance(user_id=222) == pytest.approx(500.0)
+    assert repo.get_holdings(user_id=222) == [("MSFT", 3.0)]

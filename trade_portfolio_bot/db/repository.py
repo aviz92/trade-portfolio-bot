@@ -71,5 +71,11 @@ class PortfolioRepository:
         ).fetchall()
         return list(rows)
 
+    def reset_user_data(self, user_id: int) -> None:
+        """Deletes all trades and cash deposits for a user. Other users' data is untouched."""
+        self._connection.execute("DELETE FROM trades WHERE user_id = ?", (user_id,))
+        self._connection.execute("DELETE FROM cash_deposits WHERE user_id = ?", (user_id,))
+        self._connection.commit()
+
     def close(self) -> None:
         self._connection.close()
