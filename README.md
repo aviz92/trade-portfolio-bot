@@ -6,7 +6,7 @@
 ---
 
 # 💡 trade-portfolio-bot
-A Telegram bot for logging securities purchases and sales, and cash deposits, as you make them. Send `/buy TICKER QUANTITY PRICE`, `/sell TICKER QUANTITY PRICE`, or `/deposit AMOUNT` and the bot validates, logs, and confirms it back to you.
+A Telegram bot for logging securities purchases and sales, and cash deposits, as you make them. Send `/buy TICKER QUANTITY PRICE`, `/sell TICKER QUANTITY PRICE`, or `/deposit AMOUNT` and the bot validates, logs, and confirms it back to you. `/buy` and `/deposit` ask you to pick $ or ₪ before anything is saved.
 
 ---
 
@@ -21,10 +21,10 @@ uv sync --extra dev
 ---
 
 ## 🚀 Features
-  - ✅ **`/buy TICKER QUANTITY PRICE`** — parses and validates a purchase, then logs and confirms it
+  - ✅ **`/buy TICKER QUANTITY PRICE`** — parses and validates a purchase, then asks you to confirm the currency ($ or ₪) before logging it
   - ✅ **`/sell TICKER QUANTITY PRICE`** — parses and validates a sale, then logs and confirms it
-  - ✅ **`/deposit AMOUNT`** (ILS) — parses and validates cash added to your portfolio, then logs and confirms it
-  - ✅ **`/balance`** — shows total cash deposited (ILS) and stock holdings (net quantity per ticker); the two aren't netted against each other, since trades aren't tracked in ILS
+  - ✅ **`/deposit AMOUNT`** — parses and validates cash added to your portfolio, then asks you to confirm the currency ($ or ₪) before logging it
+  - ✅ **`/balance`** — shows total cash deposited, grouped by currency, and stock holdings (net quantity per ticker); cash isn't netted against trades
   - ✅ **SQLite persistence** — every trade and deposit is saved per-user via `PortfolioRepository`, survives restarts
   - ✅ **Optional user allowlist** — set `ALLOWED_TELEGRAM_USER_IDS` to restrict who can talk to the bot at all; `/whoami` always stays reachable so new users can get their ID added
   - ✅ **`/reset`** — deletes all your trades and deposits, behind a ✅ Confirm / ❌ Cancel button prompt; only the user who ran it can confirm
@@ -104,30 +104,32 @@ print(cash.amount)
 ### Example 4: Persisting a trade to SQLite
 ```python
 from trade_portfolio_bot.db.repository import PortfolioRepository
+from trade_portfolio_bot.domain.currency import Currency
 from trade_portfolio_bot.domain.trade import TradeSide, parse_trade_command
 
 repository = PortfolioRepository("trade_portfolio_bot.db")
 trade = parse_trade_command(["AAPL", "10", "150.5"], side=TradeSide.BUY)
-repository.save_trade(trade, user_id=123456789)  # Telegram user ID
+repository.save_trade(trade, user_id=123456789, currency=Currency.USD)  # Telegram user ID
 ```
 
 ### Example 5: Reading a user's cash balance and holdings
 ```python
 from trade_portfolio_bot.domain.cash import parse_deposit_command
+from trade_portfolio_bot.domain.currency import Currency
 
-repository.save_deposit(parse_deposit_command(["1000"]), user_id=123456789)
+repository.save_deposit(parse_deposit_command(["1000"]), user_id=123456789, currency=Currency.ILS)
 
-balance = repository.get_cash_balance(user_id=123456789)  # deposits only, not netted against trades
+balance = repository.get_cash_balance(user_id=123456789)  # grouped by currency, not netted against trades
 holdings = repository.get_holdings(user_id=123456789)
 print(balance, holdings)
-# 1000.0 [('AAPL', 10.0)]
+# [('ILS', 1000.0)] [('AAPL', 10.0)]
 ```
 
 ### Example 6: Resetting a user's data
 ```python
 repository.reset_user_data(user_id=123456789)
 print(repository.get_cash_balance(user_id=123456789), repository.get_holdings(user_id=123456789))
-# 0 []
+# [] []
 ```
 
 ---

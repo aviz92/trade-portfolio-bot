@@ -5,6 +5,7 @@ import pytest
 
 from trade_portfolio_bot.db.repository import PortfolioRepository
 from trade_portfolio_bot.domain.cash import CashDeposit
+from trade_portfolio_bot.domain.currency import Currency
 from trade_portfolio_bot.domain.trade import Trade, TradeSide
 
 
@@ -62,7 +63,7 @@ def test_rows_are_attributable_to_the_correct_user(tmp_path):
 
 def test_get_cash_balance_with_no_activity_is_zero(tmp_path):
     repo = PortfolioRepository(tmp_path / "test.db")
-    assert repo.get_cash_balance(user_id=111) == 0
+    assert repo.get_cash_balance(user_id=111) == []
 
 
 def test_get_cash_balance_ignores_trades(tmp_path):
@@ -75,8 +76,8 @@ def test_get_cash_balance_ignores_trades(tmp_path):
         Trade(ticker="AAPL", side=TradeSide.SELL, quantity=4, price=160.0, timestamp=datetime.now(UTC)), user_id=111
     )
 
-    # Deposits only — buy/sell trades don't affect the cash figure (different, unlabeled currency).
-    assert repo.get_cash_balance(user_id=111) == pytest.approx(1000.0)
+    # Deposits only — buy/sell trades don't affect the cash figure.
+    assert repo.get_cash_balance(user_id=111) == [("ILS", pytest.approx(1000.0))]
 
 
 def test_get_cash_balance_sums_multiple_deposits(tmp_path):
@@ -84,7 +85,18 @@ def test_get_cash_balance_sums_multiple_deposits(tmp_path):
     repo.save_deposit(CashDeposit(amount=1000, timestamp=datetime.now(UTC)), user_id=111)
     repo.save_deposit(CashDeposit(amount=250, timestamp=datetime.now(UTC)), user_id=111)
 
-    assert repo.get_cash_balance(user_id=111) == pytest.approx(1250.0)
+    assert repo.get_cash_balance(user_id=111) == [("ILS", pytest.approx(1250.0))]
+
+
+def test_get_cash_balance_groups_by_currency(tmp_path):
+    repo = PortfolioRepository(tmp_path / "test.db")
+    repo.save_deposit(CashDeposit(amount=1000, timestamp=datetime.now(UTC)), user_id=111, currency=Currency.ILS)
+    repo.save_deposit(CashDeposit(amount=200, timestamp=datetime.now(UTC)), user_id=111, currency=Currency.USD)
+
+    assert repo.get_cash_balance(user_id=111) == [
+        ("ILS", pytest.approx(1000.0)),
+        ("USD", pytest.approx(200.0)),
+    ]
 
 
 def test_get_cash_balance_is_scoped_per_user(tmp_path):
@@ -92,8 +104,8 @@ def test_get_cash_balance_is_scoped_per_user(tmp_path):
     repo.save_deposit(CashDeposit(amount=1000, timestamp=datetime.now(UTC)), user_id=111)
     repo.save_deposit(CashDeposit(amount=500, timestamp=datetime.now(UTC)), user_id=222)
 
-    assert repo.get_cash_balance(user_id=111) == pytest.approx(1000.0)
-    assert repo.get_cash_balance(user_id=222) == pytest.approx(500.0)
+    assert repo.get_cash_balance(user_id=111) == [("ILS", pytest.approx(1000.0))]
+    assert repo.get_cash_balance(user_id=222) == [("ILS", pytest.approx(500.0))]
 
 
 def _save_trade(repo, ticker, side, quantity, user_id):
@@ -147,7 +159,7 @@ def test_reset_user_data_clears_trades_and_deposits(tmp_path):
 
     repo.reset_user_data(user_id=111)
 
-    assert repo.get_cash_balance(user_id=111) == 0
+    assert repo.get_cash_balance(user_id=111) == []
     assert not repo.get_holdings(user_id=111)
 
 
@@ -160,5 +172,52 @@ def test_reset_user_data_leaves_other_users_untouched(tmp_path):
 
     repo.reset_user_data(user_id=111)
 
-    assert repo.get_cash_balance(user_id=222) == pytest.approx(500.0)
+    assert repo.get_cash_balance(user_id=222) == [("ILS", pytest.approx(500.0))]
     assert repo.get_holdings(user_id=222) == [("MSFT", 3.0)]
+
+
+def test_migrates_pre_currency_database_without_losing_data(tmp_path):
+    """Simulates the real, already-deployed schema (no `currency` column) with actual rows in it,
+    then opens it with PortfolioRepository and checks the migration backfills safely."""
+    db_path = tmp_path / "legacy.db"
+    with sqlite3.connect(db_path) as conn:
+        conn.executescript(
+            """
+            CREATE TABLE trades (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                ticker TEXT NOT NULL,
+                side TEXT NOT NULL,
+                quantity REAL NOT NULL,
+                price REAL NOT NULL,
+                timestamp TEXT NOT NULL
+            );
+            CREATE TABLE cash_deposits (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                amount REAL NOT NULL,
+                timestamp TEXT NOT NULL
+            );
+            """
+        )
+        conn.execute(
+            "INSERT INTO trades (user_id, ticker, side, quantity, price, timestamp) VALUES (?, ?, ?, ?, ?, ?)",
+            (111, "APP", "BUY", 12.0, 10.0, "2026-08-15T16:22:51.029712+00:00"),
+        )
+        conn.execute(
+            "INSERT INTO cash_deposits (user_id, amount, timestamp) VALUES (?, ?, ?)",
+            (111, 100.0, "2026-08-15T15:56:17.754533+00:00"),
+        )
+        conn.commit()
+
+    repo = PortfolioRepository(db_path)
+
+    assert repo.get_holdings(user_id=111) == [("APP", 12.0)]
+    assert repo.get_cash_balance(user_id=111) == [("ILS", pytest.approx(100.0))]
+
+    with sqlite3.connect(db_path) as conn:
+        trade_currency = conn.execute("SELECT currency FROM trades WHERE user_id = 111").fetchone()
+        deposit_currency = conn.execute("SELECT currency FROM cash_deposits WHERE user_id = 111").fetchone()
+
+    assert trade_currency == (None,)
+    assert deposit_currency == ("ILS",)
