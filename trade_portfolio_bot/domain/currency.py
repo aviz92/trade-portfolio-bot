@@ -1,7 +1,7 @@
-from enum import Enum
+from enum import StrEnum
 
 
-class Currency(str, Enum):
+class Currency(StrEnum):
     USD = "USD"
     ILS = "ILS"
 

@@ -47,8 +47,12 @@ def _currency_keyboard(prefix: str, user_id: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         [
             [
-                InlineKeyboardButton("💵 $ Dollar", callback_data=f"{prefix}:USD:{user_id}"),
-                InlineKeyboardButton("₪ ILS", callback_data=f"{prefix}:ILS:{user_id}"),
+                InlineKeyboardButton(
+                    f"{CURRENCY_SYMBOLS[Currency.USD]} {Currency.USD}", callback_data=f"{prefix}:USD:{user_id}"
+                ),
+                InlineKeyboardButton(
+                    f"{CURRENCY_SYMBOLS[Currency.ILS]} {Currency.ILS}", callback_data=f"{prefix}:ILS:{user_id}"
+                ),
             ],
             [InlineKeyboardButton("❌ Cancel", callback_data=f"{prefix}:cancel:{user_id}")],
         ]
@@ -146,9 +150,8 @@ async def buy(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         trade = parse_trade_command(context.args or [], side=TradeSide.BUY)
     except BaseCustomException as e:
         logger.warning(f"Rejected /buy command: {e.message}", extra={"diagnostic_info": e.diagnostic_info})
-        await update.effective_message.reply_html(
-            f"⚠️ <b>{e.message}</b>\n\nUsage: {BUY_USAGE}\nExample: {BUY_EXAMPLE}"
-        )
+        message = f"⚠️ <b>{e.message}</b>\n\nUsage: {BUY_USAGE}\nExample: {BUY_EXAMPLE}"
+        await update.effective_message.reply_html(message)
         return
 
     user_id = update.effective_user.id
@@ -277,8 +280,7 @@ async def balance(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     holdings_lines = "\n".join(f"{ticker}: {quantity:g} stocks" for ticker, quantity in holdings) or "(none)"
 
     await update.effective_message.reply_html(
-        f"💰 <b>Cash</b>\n{cash_lines}\n\n"
-        f"📈 <b>Stocks held</b> (quantity — no market value)\n{holdings_lines}"
+        f"💰 <b>Cash</b>\n{cash_lines}\n\n" f"📈 <b>Stocks held</b> (quantity — no market value)\n{holdings_lines}"
     )
 
 

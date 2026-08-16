@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -10,7 +11,7 @@ from trade_portfolio_bot.domain.cash import CashDeposit
 from trade_portfolio_bot.domain.trade import Trade, TradeSide
 
 
-def _make_update(user_id, text="/buy AAPL 10 150.5"):
+def _make_update(user_id: int, text: str = "/buy AAPL 10 150.5") -> MagicMock:
     update = MagicMock()
     update.effective_user.id = user_id
     update.effective_message.text = text
@@ -18,7 +19,7 @@ def _make_update(user_id, text="/buy AAPL 10 150.5"):
     return update
 
 
-async def test_allowed_user_passes_through(monkeypatch):
+async def test_allowed_user_passes_through(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(commands, "ALLOWED_TELEGRAM_USER_IDS", frozenset({111}))
     update = _make_update(111)
 
@@ -27,7 +28,7 @@ async def test_allowed_user_passes_through(monkeypatch):
     update.effective_message.reply_html.assert_not_called()
 
 
-async def test_non_allowed_user_is_rejected(monkeypatch):
+async def test_non_allowed_user_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(commands, "ALLOWED_TELEGRAM_USER_IDS", frozenset({111}))
     update = _make_update(222)
 
@@ -37,7 +38,7 @@ async def test_non_allowed_user_is_rejected(monkeypatch):
     update.effective_message.reply_html.assert_called_once()
 
 
-async def test_empty_allowlist_lets_everyone_through(monkeypatch):
+async def test_empty_allowlist_lets_everyone_through(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(commands, "ALLOWED_TELEGRAM_USER_IDS", frozenset())
     update = _make_update(999)
 
@@ -46,7 +47,7 @@ async def test_empty_allowlist_lets_everyone_through(monkeypatch):
     update.effective_message.reply_html.assert_not_called()
 
 
-async def test_whoami_bypasses_a_populated_allowlist(monkeypatch):
+async def test_whoami_bypasses_a_populated_allowlist(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(commands, "ALLOWED_TELEGRAM_USER_IDS", frozenset({111}))
     update = _make_update(222, text="/whoami")
 
@@ -55,7 +56,7 @@ async def test_whoami_bypasses_a_populated_allowlist(monkeypatch):
     update.effective_message.reply_html.assert_not_called()
 
 
-async def test_whoami_with_bot_username_suffix_bypasses_allowlist(monkeypatch):
+async def test_whoami_with_bot_username_suffix_bypasses_allowlist(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(commands, "ALLOWED_TELEGRAM_USER_IDS", frozenset({111}))
     update = _make_update(222, text="/whoami@MyBot")
 
@@ -64,7 +65,7 @@ async def test_whoami_with_bot_username_suffix_bypasses_allowlist(monkeypatch):
     update.effective_message.reply_html.assert_not_called()
 
 
-async def test_whoami_replies_with_the_sender_user_id():
+async def test_whoami_replies_with_the_sender_user_id() -> None:
     update = _make_update(222, text="/whoami")
 
     await commands.whoami(update, MagicMock())
@@ -73,7 +74,7 @@ async def test_whoami_replies_with_the_sender_user_id():
     assert "222" in update.effective_message.reply_html.call_args[0][0]
 
 
-async def test_balance_replies_with_cash_and_no_holdings(tmp_path):
+async def test_balance_replies_with_cash_and_no_holdings(tmp_path: Path) -> None:
     repo = PortfolioRepository(tmp_path / "test.db")
     repo.save_deposit(CashDeposit(amount=1000, timestamp=datetime.now(UTC)), user_id=222)
 
@@ -88,7 +89,7 @@ async def test_balance_replies_with_cash_and_no_holdings(tmp_path):
     assert "(none)" in reply
 
 
-async def test_balance_replies_with_cash_and_holdings(tmp_path):
+async def test_balance_replies_with_cash_and_holdings(tmp_path: Path) -> None:
     repo = PortfolioRepository(tmp_path / "test.db")
     repo.save_deposit(CashDeposit(amount=1000, timestamp=datetime.now(UTC)), user_id=222)
     repo.save_trade(

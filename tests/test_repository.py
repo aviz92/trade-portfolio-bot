@@ -1,5 +1,6 @@
 import sqlite3
 from datetime import UTC, datetime
+from pathlib import Path
 
 import pytest
 
@@ -9,7 +10,7 @@ from trade_portfolio_bot.domain.currency import Currency
 from trade_portfolio_bot.domain.trade import Trade, TradeSide
 
 
-def test_init_creates_schema(tmp_path):
+def test_init_creates_schema(tmp_path: Path) -> None:
     db_path = tmp_path / "test.db"
     PortfolioRepository(db_path)
 
@@ -18,7 +19,7 @@ def test_init_creates_schema(tmp_path):
     assert {"trades", "cash_deposits"} <= tables
 
 
-def test_save_trade_persists_row(tmp_path):
+def test_save_trade_persists_row(tmp_path: Path) -> None:
     db_path = tmp_path / "test.db"
     repo = PortfolioRepository(db_path)
     trade = Trade(ticker="AAPL", side=TradeSide.BUY, quantity=10, price=150.5, timestamp=datetime.now(UTC))
@@ -31,7 +32,7 @@ def test_save_trade_persists_row(tmp_path):
     assert rows == [(111, "AAPL", "BUY", 10.0, 150.5)]
 
 
-def test_save_deposit_persists_row(tmp_path):
+def test_save_deposit_persists_row(tmp_path: Path) -> None:
     db_path = tmp_path / "test.db"
     repo = PortfolioRepository(db_path)
     cash = CashDeposit(amount=1000, timestamp=datetime.now(UTC))
@@ -44,7 +45,7 @@ def test_save_deposit_persists_row(tmp_path):
     assert rows == [(111, 1000.0)]
 
 
-def test_rows_are_attributable_to_the_correct_user(tmp_path):
+def test_rows_are_attributable_to_the_correct_user(tmp_path: Path) -> None:
     db_path = tmp_path / "test.db"
     repo = PortfolioRepository(db_path)
     trade_a = Trade(ticker="AAPL", side=TradeSide.BUY, quantity=10, price=150.5, timestamp=datetime.now(UTC))
@@ -61,12 +62,12 @@ def test_rows_are_attributable_to_the_correct_user(tmp_path):
     assert user_b_tickers == ["MSFT"]
 
 
-def test_get_cash_balance_with_no_activity_is_zero(tmp_path):
+def test_get_cash_balance_with_no_activity_is_zero(tmp_path: Path) -> None:
     repo = PortfolioRepository(tmp_path / "test.db")
-    assert repo.get_cash_balance(user_id=111) == []
+    assert not repo.get_cash_balance(user_id=111)
 
 
-def test_get_cash_balance_ignores_trades(tmp_path):
+def test_get_cash_balance_ignores_trades(tmp_path: Path) -> None:
     repo = PortfolioRepository(tmp_path / "test.db")
     repo.save_deposit(CashDeposit(amount=1000, timestamp=datetime.now(UTC)), user_id=111)
     repo.save_trade(
@@ -80,7 +81,7 @@ def test_get_cash_balance_ignores_trades(tmp_path):
     assert repo.get_cash_balance(user_id=111) == [("ILS", pytest.approx(1000.0))]
 
 
-def test_get_cash_balance_sums_multiple_deposits(tmp_path):
+def test_get_cash_balance_sums_multiple_deposits(tmp_path: Path) -> None:
     repo = PortfolioRepository(tmp_path / "test.db")
     repo.save_deposit(CashDeposit(amount=1000, timestamp=datetime.now(UTC)), user_id=111)
     repo.save_deposit(CashDeposit(amount=250, timestamp=datetime.now(UTC)), user_id=111)
@@ -88,7 +89,7 @@ def test_get_cash_balance_sums_multiple_deposits(tmp_path):
     assert repo.get_cash_balance(user_id=111) == [("ILS", pytest.approx(1250.0))]
 
 
-def test_get_cash_balance_groups_by_currency(tmp_path):
+def test_get_cash_balance_groups_by_currency(tmp_path: Path) -> None:
     repo = PortfolioRepository(tmp_path / "test.db")
     repo.save_deposit(CashDeposit(amount=1000, timestamp=datetime.now(UTC)), user_id=111, currency=Currency.ILS)
     repo.save_deposit(CashDeposit(amount=200, timestamp=datetime.now(UTC)), user_id=111, currency=Currency.USD)
@@ -99,7 +100,7 @@ def test_get_cash_balance_groups_by_currency(tmp_path):
     ]
 
 
-def test_get_cash_balance_is_scoped_per_user(tmp_path):
+def test_get_cash_balance_is_scoped_per_user(tmp_path: Path) -> None:
     repo = PortfolioRepository(tmp_path / "test.db")
     repo.save_deposit(CashDeposit(amount=1000, timestamp=datetime.now(UTC)), user_id=111)
     repo.save_deposit(CashDeposit(amount=500, timestamp=datetime.now(UTC)), user_id=222)
@@ -108,18 +109,18 @@ def test_get_cash_balance_is_scoped_per_user(tmp_path):
     assert repo.get_cash_balance(user_id=222) == [("ILS", pytest.approx(500.0))]
 
 
-def _save_trade(repo, ticker, side, quantity, user_id):
+def _save_trade(repo: PortfolioRepository, ticker: str, side: TradeSide, quantity: float, user_id: int) -> None:
     repo.save_trade(
         Trade(ticker=ticker, side=side, quantity=quantity, price=100.0, timestamp=datetime.now(UTC)), user_id=user_id
     )
 
 
-def test_get_holdings_with_no_trades_is_empty(tmp_path):
+def test_get_holdings_with_no_trades_is_empty(tmp_path: Path) -> None:
     repo = PortfolioRepository(tmp_path / "test.db")
     assert not repo.get_holdings(user_id=111)
 
 
-def test_get_holdings_nets_buys_and_sells(tmp_path):
+def test_get_holdings_nets_buys_and_sells(tmp_path: Path) -> None:
     repo = PortfolioRepository(tmp_path / "test.db")
     _save_trade(repo, "AAPL", TradeSide.BUY, 10, user_id=111)
     _save_trade(repo, "AAPL", TradeSide.SELL, 4, user_id=111)
@@ -127,7 +128,7 @@ def test_get_holdings_nets_buys_and_sells(tmp_path):
     assert repo.get_holdings(user_id=111) == [("AAPL", 6.0)]
 
 
-def test_get_holdings_omits_fully_closed_positions(tmp_path):
+def test_get_holdings_omits_fully_closed_positions(tmp_path: Path) -> None:
     repo = PortfolioRepository(tmp_path / "test.db")
     _save_trade(repo, "AAPL", TradeSide.BUY, 10, user_id=111)
     _save_trade(repo, "AAPL", TradeSide.SELL, 10, user_id=111)
@@ -135,7 +136,7 @@ def test_get_holdings_omits_fully_closed_positions(tmp_path):
     assert not repo.get_holdings(user_id=111)
 
 
-def test_get_holdings_covers_multiple_tickers_sorted(tmp_path):
+def test_get_holdings_covers_multiple_tickers_sorted(tmp_path: Path) -> None:
     repo = PortfolioRepository(tmp_path / "test.db")
     _save_trade(repo, "MSFT", TradeSide.BUY, 3, user_id=111)
     _save_trade(repo, "AAPL", TradeSide.BUY, 5, user_id=111)
@@ -143,7 +144,7 @@ def test_get_holdings_covers_multiple_tickers_sorted(tmp_path):
     assert repo.get_holdings(user_id=111) == [("AAPL", 5.0), ("MSFT", 3.0)]
 
 
-def test_get_holdings_is_scoped_per_user(tmp_path):
+def test_get_holdings_is_scoped_per_user(tmp_path: Path) -> None:
     repo = PortfolioRepository(tmp_path / "test.db")
     _save_trade(repo, "AAPL", TradeSide.BUY, 5, user_id=111)
     _save_trade(repo, "MSFT", TradeSide.BUY, 3, user_id=222)
@@ -152,18 +153,18 @@ def test_get_holdings_is_scoped_per_user(tmp_path):
     assert repo.get_holdings(user_id=222) == [("MSFT", 3.0)]
 
 
-def test_reset_user_data_clears_trades_and_deposits(tmp_path):
+def test_reset_user_data_clears_trades_and_deposits(tmp_path: Path) -> None:
     repo = PortfolioRepository(tmp_path / "test.db")
     repo.save_deposit(CashDeposit(amount=1000, timestamp=datetime.now(UTC)), user_id=111)
     _save_trade(repo, "AAPL", TradeSide.BUY, 10, user_id=111)
 
     repo.reset_user_data(user_id=111)
 
-    assert repo.get_cash_balance(user_id=111) == []
+    assert not repo.get_cash_balance(user_id=111)
     assert not repo.get_holdings(user_id=111)
 
 
-def test_reset_user_data_leaves_other_users_untouched(tmp_path):
+def test_reset_user_data_leaves_other_users_untouched(tmp_path: Path) -> None:
     repo = PortfolioRepository(tmp_path / "test.db")
     repo.save_deposit(CashDeposit(amount=1000, timestamp=datetime.now(UTC)), user_id=111)
     _save_trade(repo, "AAPL", TradeSide.BUY, 10, user_id=111)
@@ -176,7 +177,7 @@ def test_reset_user_data_leaves_other_users_untouched(tmp_path):
     assert repo.get_holdings(user_id=222) == [("MSFT", 3.0)]
 
 
-def test_migrates_pre_currency_database_without_losing_data(tmp_path):
+def test_migrates_pre_currency_database_without_losing_data(tmp_path: Path) -> None:
     """Simulates the real, already-deployed schema (no `currency` column) with actual rows in it,
     then opens it with PortfolioRepository and checks the migration backfills safely."""
     db_path = tmp_path / "legacy.db"

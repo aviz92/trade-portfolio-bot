@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from enum import Enum
+from enum import StrEnum
 
 from trade_portfolio_bot.domain.exceptions import (
     InvalidPriceException,
@@ -11,7 +11,7 @@ from trade_portfolio_bot.domain.exceptions import (
 from trade_portfolio_bot.domain.validators import parse_positive_float
 
 
-class TradeSide(str, Enum):
+class TradeSide(StrEnum):
     BUY = "BUY"
     SELL = "SELL"
 
