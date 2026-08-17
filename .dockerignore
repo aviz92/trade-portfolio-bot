@@ -1,0 +1,14 @@
+.venv
+.git
+.github
+.idea
+.pytest_cache
+.ruff_cache
+__pycache__
+*.pyc
+tests
+results_output
+*.db
+.env
+.env.*
+CHANGELOG.md
